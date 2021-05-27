@@ -6,10 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CriarCartaoApi.Models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace CriarCartaoApi.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/Cartoes")]
     [ApiController]
     public class CartoesController : ControllerBase
     {
@@ -40,6 +41,26 @@ namespace CriarCartaoApi.Controllers
 
             return cartao;
         }
+
+        [HttpGet("pesquisa/{email}")]
+        public async Task<ActionResult<Cartao>> GetbyEmail(string email)
+        {
+            var contas = from c in _context.Cartoes
+                        select c;
+            if (!String.IsNullOrEmpty(email))
+            {
+                contas = contas.Where(c => c.Email.Equals(email));
+                contas = contas.OrderBy(c => Convert.ToDateTime(c.DataSolicita));
+            }
+
+            if (contas == null)
+            {
+                return NotFound();
+            }
+
+            var cartoesUsuario = await contas.ToListAsync();
+            return CreatedAtAction(nameof(GetbyEmail), cartoesUsuario);
+        } 
 
         // PUT: api/Cartoes/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
@@ -77,10 +98,23 @@ namespace CriarCartaoApi.Controllers
         [HttpPost]
         public async Task<ActionResult<Cartao>> PostCartao(Cartao cartao)
         {
+            //Código que gera o número do cartão com 16 dígitos para salvar no BD
+            string newCardNumber = "";
+            Random randNum = new Random();
+            for (int i = 0; i < 16; i++)
+            {
+                int digito = randNum.Next(0,9);
+                newCardNumber += digito;
+            }
+            cartao.CardNumber = newCardNumber;
+
+            //Buscando a data e hora do momento da criação do cartão para salvar no BD
+            string data = DateTime.Now.ToString();
+            cartao.DataSolicita = data;
+            
             _context.Cartoes.Add(cartao);
             await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetCartao), new { id = cartao.Id }, cartao);
+            return CreatedAtAction(nameof(GetCartao), new { id = cartao.Id }, cartao.CardNumber);
         }
 
         // DELETE: api/Cartoes/5
